@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-글로벌 주가지수 대시보드 (Python/Streamlit 버전) - v3.2
-에러 처리 강화 버전
+글로벌 주가지수 대시보드 (Python/Streamlit 버전) - v3.0
+벨류에이션 지표 추가 (PER, PBR, 배당수익률, 시가총액)
 """
 
 import streamlit as st
@@ -36,7 +36,9 @@ INDICES = {
     "🇫🇷 프랑스 (CAC 40)": "^FCHI"
 }
 
+# ============================================================
 # 미국 섹터 ETF
+# ============================================================
 US_SECTORS = {
     "🏭 기술 (Technology)": "XLK",
     "🏥 헬스케어 (Healthcare)": "XLV",
@@ -51,7 +53,9 @@ US_SECTORS = {
     "⚙️ 유틸리티 (Utilities)": "XLU"
 }
 
+# ============================================================
 # 미국 스타일 ETF
+# ============================================================
 US_STYLES = {
     "📈 대형주 성장 (Large Growth)": "IVW",
     "💎 대형주 가치 (Large Value)": "IVE",
@@ -65,7 +69,9 @@ US_STYLES = {
     "⚡ 모멘텀 (Momentum)": "MTUM"
 }
 
+# ============================================================
 # 대체투자 ETF
+# ============================================================
 ALTERNATIVES = {
     "🥇 금 (Gold)": "GLD",
     "🥈 은 (Silver)": "SLV",
@@ -81,7 +87,9 @@ ALTERNATIVES = {
     "💧 수자원 (Water)": "PHO"
 }
 
+# ============================================================
 # 채권 ETF
+# ============================================================
 BONDS = {
     "🏦 미국 국채 20년+ (Long-Term)": "TLT",
     "📊 미국 국채 7-10년 (Mid-Term)": "IEF",
@@ -98,151 +106,180 @@ BONDS = {
 }
 
 
-def safe_get_price(series, index):
-    """안전하게 가격을 추출하는 함수"""
-    try:
-        val = series.iloc[index]
-        if hasattr(val, 'item'):
-            return val.item()
-        return float(val)
-    except:
-        return None
-
-
-def calculate_returns(ticker, name, base_date=None, debug=False):
+# ============================================================
+# 수익률 계산 함수
+# ============================================================
+def calculate_returns(ticker, name, debug=False):
     """주식/지수의 수익률을 계산하는 함수"""
     try:
-        # 기준일자 설정
-        if base_date is None:
-            end_date = datetime.now()
-        else:
-            end_date = datetime.combine(base_date, datetime.max.time())
-
+        # 데이터 가져오기 (5년치)
+        end_date = datetime.now()
         start_date = end_date - timedelta(days=365 * 5)
 
-        # yfinance 다운로드
-        try:
-            data = yf.download(ticker, start=start_date, end=end_date, progress=False)
-        except Exception as e:
-            if debug:
-                st.warning(f"다운로드 실패 ({ticker}): {str(e)}")
-            return None
+        data = yf.download(ticker, start=start_date, end=end_date, progress=False)
 
-        # 데이터 유효성 검사
         if data is None or len(data) == 0:
-            if debug:
-                st.warning(f"데이터 없음: {ticker}")
             return None
 
-        # 종가 데이터 추출 (다양한 컬럼 구조 처리)
-        try:
-            if isinstance(data.columns, pd.MultiIndex):
-                # MultiIndex인 경우 (yfinance 최신 버전)
-                close_prices = data['Close'].iloc[:, 0].dropna()
-            elif 'Close' in data.columns:
-                close_prices = data['Close'].dropna()
-            else:
-                if debug:
-                    st.warning(f"Close 컬럼 없음: {ticker}, 컬럼: {data.columns.tolist()}")
-                return None
-        except Exception as e:
-            if debug:
-                st.warning(f"종가 추출 실패 ({ticker}): {str(e)}")
-            return None
+        # 종가 데이터 추출
+        close_prices = data['Close'].dropna()
 
         if len(close_prices) < 2:
-            if debug:
-                st.warning(f"데이터 부족: {ticker}")
             return None
 
         # 현재 가격/날짜
         current_date = close_prices.index[-1]
-        current_price = safe_get_price(close_prices, -1)
+        current_price = close_prices.iloc[-1].item()
 
-        if current_price is None:
-            return None
-
-        # 벨류에이션 지표
-        per_str, pbr_str, div_yield_str, market_cap_str = "N/A", "N/A", "N/A", "N/A"
+        # ============================================================
+        # 벨류에이션 지표 가져오기
+        # ============================================================
         try:
             ticker_info = yf.Ticker(ticker)
-            info = ticker_info.info or {}
+            info = ticker_info.info
 
-            per = info.get('trailingPE')
-            if per and not pd.isna(per):
+            # PER (Trailing P/E)
+            per = info.get('trailingPE', None)
+            if per is not None and not pd.isna(per):
                 per_str = f"{per:.2f}"
+            else:
+                per_str = "N/A"
 
-            pbr = info.get('priceToBook')
-            if pbr and not pd.isna(pbr):
+            # PBR (Price to Book)
+            pbr = info.get('priceToBook', None)
+            if pbr is not None and not pd.isna(pbr):
                 pbr_str = f"{pbr:.2f}"
+            else:
+                pbr_str = "N/A"
 
-            div_yield = info.get('dividendYield')
-            if div_yield and not pd.isna(div_yield):
+            # 배당수익률
+            div_yield = info.get('dividendYield', None)
+            if div_yield is not None and not pd.isna(div_yield):
                 div_yield_str = f"{div_yield * 100:.2f}%"
+            else:
+                div_yield_str = "N/A"
 
-            market_cap = info.get('marketCap')
-            if market_cap and not pd.isna(market_cap):
+            # 시가총액 (억 달러)
+            market_cap = info.get('marketCap', None)
+            if market_cap is not None and not pd.isna(market_cap):
                 market_cap_str = f"${market_cap / 1e9:.1f}B"
-        except:
-            pass
+            else:
+                market_cap_str = "N/A"
+
+        except Exception as e:
+            if debug:
+                st.write(f"벨류에이션 지표 로딩 실패: {str(e)}")
+            per_str = "N/A"
+            pbr_str = "N/A"
+            div_yield_str = "N/A"
+            market_cap_str = "N/A"
 
         if debug:
-            st.write(f"=== {name} ({ticker}) ===")
-            st.write(f"기준 날짜: {current_date}, 가격: {current_price}")
+            st.write(f"\n=== {name} ({ticker}) ===")
+            st.write(f"현재 날짜: {current_date}")
+            st.write(f"현재 가격: {current_price}")
+            st.write(f"PER: {per_str}, PBR: {pbr_str}, 배당: {div_yield_str}")
+            st.write(f"전체 데이터 개수: {len(close_prices)}")
 
-        # 수익률 계산 함수
+        # 안전한 수익률 계산 함수
         def safe_return(current, base):
             if base is None or pd.isna(base) or base == 0:
                 return 0.0
             ret = ((current - base) / base) * 100
-            if pd.isna(ret) or abs(ret) == float('inf'):
+            if pd.isna(ret) or ret == float('inf') or ret == float('-inf'):
                 return 0.0
             return float(ret)
 
-        # 각 기간별 수익률 계산
-        daily_return = 0.0
+        # 전일대비 (1거래일 전)
         if len(close_prices) >= 2:
-            prev_price = safe_get_price(close_prices, -2)
+            prev_price = close_prices.iloc[-2].item()
             daily_return = safe_return(current_price, prev_price)
+        else:
+            daily_return = 0.0
 
-        monthly_return = 0.0
+        # 월간 (30거래일 전)
         if len(close_prices) >= 31:
-            monthly_return = safe_return(current_price, safe_get_price(close_prices, -31))
+            month_ago_price = close_prices.iloc[-31].item()
+            monthly_return = safe_return(current_price, month_ago_price)
+        else:
+            monthly_return = 0.0
 
-        quarterly_return = 0.0
+        # 분기 (63거래일 전)
         if len(close_prices) >= 64:
-            quarterly_return = safe_return(current_price, safe_get_price(close_prices, -64))
+            quarter_ago_price = close_prices.iloc[-64].item()
+            quarterly_return = safe_return(current_price, quarter_ago_price)
+        else:
+            quarterly_return = 0.0
 
-        yearly_return = 0.0
+        # 1년 (252거래일 전)
         if len(close_prices) >= 253:
-            yearly_return = safe_return(current_price, safe_get_price(close_prices, -253))
+            year_ago_price = close_prices.iloc[-253].item()
+            yearly_return = safe_return(current_price, year_ago_price)
+        else:
+            yearly_return = 0.0
 
-        three_yearly_return = 0.0
+        # 3년 (756거래일 전)
         if len(close_prices) >= 757:
-            three_yearly_return = safe_return(current_price, safe_get_price(close_prices, -757))
+            three_year_ago_price = close_prices.iloc[-757].item()
+            three_yearly_return = safe_return(current_price, three_year_ago_price)
+        else:
+            three_yearly_return = 0.0
 
-        # MTD 계산
-        mtd_return = 0.0
-        try:
-            current_ym = current_date.strftime("%Y-%m")
-            month_data = close_prices[close_prices.index.strftime("%Y-%m") == current_ym]
-            if len(month_data) >= 2:
-                mtd_return = safe_return(current_price, safe_get_price(month_data, 0))
-        except:
-            pass
+        # MTD: 이번 달 첫 거래일
+        current_ym = current_date.strftime("%Y-%m")
+        month_data = close_prices[close_prices.index.strftime("%Y-%m") == current_ym]
 
-        # YTD 계산
-        ytd_return = 0.0
-        try:
-            current_year = str(current_date.year)
-            year_data = close_prices[close_prices.index.strftime("%Y") == current_year]
-            if len(year_data) >= 2:
-                ytd_return = safe_return(current_price, safe_get_price(year_data, 0))
-            elif len(close_prices) >= 253:
-                ytd_return = safe_return(current_price, safe_get_price(close_prices, -253))
-        except:
-            pass
+        if len(month_data) >= 2:
+            mtd_price = month_data.iloc[0].item()
+            mtd_return = safe_return(current_price, mtd_price)
+        elif len(month_data) == 1:
+            # 이번 달 데이터가 1개면 전월 마지막
+            prev_month = (current_date.replace(day=1) - timedelta(days=1)).strftime("%Y-%m")
+            prev_month_data = close_prices[close_prices.index.strftime("%Y-%m") == prev_month]
+            if len(prev_month_data) > 0:
+                mtd_price = prev_month_data.iloc[-1].item()
+                mtd_return = safe_return(current_price, mtd_price)
+            else:
+                mtd_return = 0.0
+        else:
+            mtd_return = 0.0
 
+        # YTD: 올해 첫 거래일
+        current_year = str(current_date.year)
+        year_data = close_prices[close_prices.index.strftime("%Y") == current_year]
+
+        if len(year_data) >= 2:
+            # 올해 첫 거래일 가격
+            ytd_price = year_data.iloc[0].item()
+            ytd_return = safe_return(current_price, ytd_price)
+
+            if debug:
+                st.write("YTD 방법 1 사용 (올해 첫 거래일)")
+                st.write(f"올해 데이터 개수: {len(year_data)}")
+                st.write(f"YTD 기준가: {ytd_price}")
+                st.write(f"YTD 수익률: {ytd_return}%")
+        else:
+            # 방법 2: 작년 마지막 거래일 사용
+            last_year = str(int(current_year) - 1)
+            last_year_data = close_prices[close_prices.index.strftime("%Y") == last_year]
+
+            if len(last_year_data) > 0:
+                ytd_price = last_year_data.iloc[-1].item()
+                ytd_return = safe_return(current_price, ytd_price)
+
+                if debug:
+                    st.write("YTD 방법 2 사용 (작년 마지막 거래일)")
+                    st.write(f"YTD 기준가: {ytd_price}")
+                    st.write(f"YTD 수익률: {ytd_return}%")
+            else:
+                # 방법 3: 252거래일 전 가격 사용
+                if len(close_prices) >= 253:
+                    ytd_price = close_prices.iloc[-253].item()
+                    ytd_return = safe_return(current_price, ytd_price)
+                else:
+                    ytd_return = 0.0
+
+        # 결과 반환
         return {
             "국가/지수": name,
             "현재지수": f"{current_price:.2f}",
@@ -268,14 +305,17 @@ def calculate_returns(ticker, name, base_date=None, debug=False):
 
     except Exception as e:
         if debug:
-            st.error(f"오류 ({name}): {str(e)}")
+            st.error(f"Error loading {name}: {str(e)}")
         return None
 
 
-def load_data(tickers_dict, base_date=None, debug=False):
-    """여러 티커의 데이터를 로드"""
+# ============================================================
+# 데이터 로드 함수
+# ============================================================
+@st.cache_data(ttl=1800)  # 30분 캐시
+def load_data(tickers_dict, debug=False):
+    """여러 티커의 데이터를 로드하는 함수"""
     data_list = []
-    failed_list = []
 
     progress_bar = st.progress(0)
     status_text = st.empty()
@@ -285,31 +325,33 @@ def load_data(tickers_dict, base_date=None, debug=False):
         status_text.text(f"로딩 중... {name}")
         progress_bar.progress((i + 1) / total)
 
-        result = calculate_returns(ticker, name, base_date, debug)
+        result = calculate_returns(ticker, name, debug)
         if result is not None:
             data_list.append(result)
-        else:
-            failed_list.append(name)
 
     progress_bar.empty()
     status_text.empty()
-
-    if failed_list:
-        st.warning(f"⚠️ 로딩 실패: {', '.join(failed_list)}")
 
     if len(data_list) > 0:
         return pd.DataFrame(data_list)
     return None
 
 
+# ============================================================
+# 차트 생성 함수
+# ============================================================
 def create_bar_chart(df, column_name, num_column, title):
-    """수평 막대 차트 생성"""
+    """수평 막대 차트를 생성하는 함수"""
     if df is None or len(df) == 0:
         return None
 
+    # 데이터 정렬
     chart_data = df.sort_values(by=num_column, ascending=True)
+
+    # 색상 설정
     colors = ['green' if x >= 0 else 'red' for x in chart_data[num_column]]
 
+    # 차트 생성
     fig = go.Figure(data=[
         go.Bar(
             y=chart_data['국가/지수'],
@@ -332,30 +374,16 @@ def create_bar_chart(df, column_name, num_column, title):
     return fig
 
 
+# ============================================================
+# 메인 앱
+# ============================================================
 def main():
-    st.title("📊 글로벌 주가지수 대시보드 v3.2")
-    st.caption("💹 에러 처리 강화 + 기준일자 선택")
+    st.title("📊 글로벌 주가지수 대시보드 v3.0")
+    st.caption("💹 벨류에이션 지표 추가: PER, PBR, 배당수익률, 시가총액")
 
+    # 사이드바
     with st.sidebar:
         st.header("설정")
-
-        st.subheader("📅 기준일자")
-        date_option = st.radio("기준일자 선택", ["오늘", "직접 선택"], horizontal=True)
-
-        if date_option == "오늘":
-            base_date = None
-            display_date = datetime.now().strftime('%Y-%m-%d')
-        else:
-            base_date = st.date_input(
-                "날짜 선택",
-                value=datetime.now().date(),
-                max_value=datetime.now().date(),
-                min_value=datetime.now().date() - timedelta(days=365 * 5)
-            )
-            display_date = base_date.strftime('%Y-%m-%d')
-
-        st.info(f"📌 기준일: **{display_date}**")
-        st.divider()
 
         tab_selection = st.radio(
             "카테고리 선택",
@@ -364,67 +392,94 @@ def main():
 
         st.divider()
 
-        if st.button("🔄 새로고침", use_container_width=True):
+        if st.button("🔄 새로고침", width='stretch'):
             st.cache_data.clear()
             st.rerun()
 
+        auto_refresh = st.checkbox("자동 새로고침 (30초)")
         debug_mode = st.checkbox("디버그 모드")
 
+        if auto_refresh:
+            time.sleep(30)
+            st.rerun()
+
     # 데이터 선택
-    category_map = {
-        "글로벌 지수": INDICES,
-        "미국 섹터": US_SECTORS,
-        "미국 스타일": US_STYLES,
-        "대체투자": ALTERNATIVES,
-        "채권": BONDS
-    }
-    tickers_dict = category_map[tab_selection]
+    if tab_selection == "글로벌 지수":
+        tickers_dict = INDICES
+        category_name = "글로벌 지수"
+    elif tab_selection == "미국 섹터":
+        tickers_dict = US_SECTORS
+        category_name = "미국 섹터"
+    elif tab_selection == "미국 스타일":
+        tickers_dict = US_STYLES
+        category_name = "미국 스타일"
+    elif tab_selection == "대체투자":
+        tickers_dict = ALTERNATIVES
+        category_name = "대체투자"
+    else:  # 채권
+        tickers_dict = BONDS
+        category_name = "채권"
 
-    st.info(f"📅 기준일자: **{display_date}** | 업데이트: {datetime.now().strftime('%H:%M:%S')}")
+    # 데이터 로드
+    st.info(f"업데이트 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
-    df = load_data(tickers_dict, base_date, debug_mode)
+    df = load_data(tickers_dict, debug_mode)
 
     if df is None or len(df) == 0:
-        st.error("데이터를 불러올 수 없습니다. 잠시 후 다시 시도해주세요.")
+        st.error("데이터를 불러올 수 없습니다.")
         return
 
     # 요약 통계
     col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("상승", f"{(df['daily_num'] > 0).sum()}개", delta="↑")
-    with col2:
-        st.metric("하락", f"{(df['daily_num'] < 0).sum()}개", delta="↓")
-    with col3:
-        st.metric("평균 전일대비", f"{df['daily_num'].mean():+.2f}%")
-    with col4:
-        st.metric("평균 YTD", f"{df['ytd_num'].mean():+.2f}%")
 
-    # 테이블
-    st.subheader(f"📈 {tab_selection} 현황")
+    with col1:
+        up_count = (df['daily_num'] > 0).sum()
+        st.metric("상승 개수", f"{up_count}개", delta="↑")
+
+    with col2:
+        down_count = (df['daily_num'] < 0).sum()
+        st.metric("하락 개수", f"{down_count}개", delta="↓")
+
+    with col3:
+        avg_daily = df['daily_num'].mean()
+        st.metric("평균 전일대비", f"{avg_daily:+.2f}%")
+
+    with col4:
+        avg_ytd = df['ytd_num'].mean()
+        st.metric("평균 YTD", f"{avg_ytd:+.2f}%")
+
+    # 테이블 표시
+    st.subheader(f"📈 {category_name} 현황")
+
+    # 벨류에이션 지표 포함한 컬럼 표시
     display_columns = ['국가/지수', '현재지수', 'PER', 'PBR', '배당수익률', '시가총액',
                        '전일대비', '월간', 'MTD', '분기', 'YTD', '1년', '3년']
-    st.dataframe(df[display_columns], use_container_width=True, hide_index=True)
+    st.dataframe(df[display_columns], width='stretch', hide_index=True)
 
-    # 차트
+    # 차트 탭
     st.subheader("📊 수익률 비교 차트")
-    tab1, tab2, tab3, tab4 = st.tabs(["전일대비", "YTD", "1년", "3년"])
+
+    tab1, tab2, tab3, tab4 = st.tabs(["전일대비", "YTD", "1년 수익률", "3년 수익률"])
 
     with tab1:
         fig = create_bar_chart(df, '전일대비', 'daily_num', '전일대비 수익률 (%)')
         if fig:
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
+
     with tab2:
         fig = create_bar_chart(df, 'YTD', 'ytd_num', 'YTD 수익률 (%)')
         if fig:
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
+
     with tab3:
         fig = create_bar_chart(df, '1년', 'yearly_num', '1년 수익률 (%)')
         if fig:
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
+
     with tab4:
         fig = create_bar_chart(df, '3년', 'three_yearly_num', '3년 수익률 (%)')
         if fig:
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
 
 
 if __name__ == "__main__":

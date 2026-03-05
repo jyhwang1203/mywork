@@ -46,7 +46,6 @@ class YouTubeShortCollector:
         if channel_url.startswith('@'):
             return self.get_channel_id_from_handle(channel_url[1:])
 
-        # If it's just the handle name without @, try adding @
         return self.get_channel_id_from_handle(channel_url)
 
     def get_channel_id_from_handle(self, handle):
@@ -55,7 +54,6 @@ class YouTubeShortCollector:
             clean_handle = handle.lstrip('@')
             print(f"  '{clean_handle}' 채널 검색 중...")
 
-            # 방법 1: Search API
             search_response = self.youtube.search().list(
                 part='snippet',
                 q=clean_handle,
@@ -64,12 +62,10 @@ class YouTubeShortCollector:
             ).execute()
 
             if search_response.get('items'):
-                # First result
                 item = search_response['items'][0]
                 print(f"  ✓ '{item['snippet']['channelTitle']}' 채널 찾음!")
                 return item['snippet']['channelId']
 
-            # 방법 2: Channels list with forUsername (Deprecated but sometimes works)
             try:
                 response = self.youtube.channels().list(
                     part='id',
@@ -86,8 +82,7 @@ class YouTubeShortCollector:
         raise ValueError(f"채널을 찾을 수 없습니다: {handle}")
 
     def get_all_videos(self, channel_id, max_videos=None):
-        """채널의 동영상 ID 가져오기 (max_videos로 제한 가능)"""
-        # 채널의 업로드 재생목록 ID 가져오기
+        """채널의 동영상 ID 가져오기"""
         channel_response = self.youtube.channels().list(
             part='contentDetails,snippet',
             id=channel_id
@@ -126,7 +121,7 @@ class YouTubeShortCollector:
         """동영상이 쇼츠인지 확인 (60초 이하)"""
         try:
             duration = isodate.parse_duration(duration_str)
-            return duration.total_seconds() <= 61  # 1 second buffer
+            return duration.total_seconds() <= 61
         except:
             return False
 
@@ -161,7 +156,7 @@ class YouTubeShortCollector:
             '참여도': round(engagement_rate, 2)
         }
 
-    def collect_shorts_data(self, channel_url):
+    def collect_shorts_data(self, channel_url, get_all_transcripts=False):
         channel_id = self.extract_channel_id(channel_url)
         print(f"채널 ID: {channel_id}")
 
@@ -169,9 +164,6 @@ class YouTubeShortCollector:
         shorts_data = []
 
         video_ids = [v['contentDetails']['videoId'] for v in videos]
-
-        # Bath process video details to save API quota
-        # chunking by 50
         chunks = [video_ids[i:i + 50] for i in range(0, len(video_ids), 50)]
 
         print(f"동영상 {len(video_ids)}개 확인 중...")
@@ -195,16 +187,20 @@ class YouTubeShortCollector:
                         engagement = self.calculate_engagement_metrics(views, likes, comments)
 
                         published_at = snippet['publishedAt']
-                        # Simple date formatting
                         dt = datetime.strptime(published_at, '%Y-%m-%dT%H:%M:%SZ')
-                        # Assuming KST for simplicity or just keep it simple
                         date_only = dt.strftime('%Y-%m-%d')
+
+                        # 대본 수집: get_all_transcripts=True이면 모든 영상, 아니면 100만뷰 이상만
+                        if get_all_transcripts:
+                            transcript = self.get_transcript(item['id'])
+                        else:
+                            transcript = self.get_transcript(item['id']) if views >= 1000000 else ""
 
                         short_info = {
                             '동영상ID': item['id'],
                             '제목': snippet['title'],
                             '설명': snippet['description'],
-                            '스크립트': self.get_transcript(item['id']) if views >= 1000000 else "",
+                            '스크립트': transcript,
                             '업로드날짜': date_only,
                             '조회수': views,
                             '좋아요': likes,
@@ -222,7 +218,6 @@ class YouTubeShortCollector:
     def save_to_csv(self, data, filename):
         if not data: return
 
-        # Ensure directory exists
         os.makedirs(os.path.dirname(filename), exist_ok=True)
 
         with open(filename, 'w', encoding='utf-8-sig', newline='') as f:
@@ -231,45 +226,76 @@ class YouTubeShortCollector:
             writer.writerows(data)
         print(f"Saved {filename}")
 
+    def save_to_json(self, data, filename):
+        if not data: return
+
+        os.makedirs(os.path.dirname(filename), exist_ok=True)
+
+        with open(filename, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        print(f"Saved {filename}")
+
 
 def main():
     API_KEY = "AIzaSyDS9QZILQ6wR3hpJ1hm9IWRJMPn1ebPmr4"
 
+    # 요청된 두 채널만
     CHANNELS = {
-        "Luyenmovie": "https://www.youtube.com/@Luyenmovie",
-        "Creammovie": "https://www.youtube.com/@Creammovie-b5u",
-        "FixClipss": "https://www.youtube.com/@FixClipss",
         "MushroomScreen": "https://www.youtube.com/@MushroomScreen-tl1rf",
         "CuriousPM90": "https://www.youtube.com/@CuriousPM90",
-        "CineRecap": "https://www.youtube.com/@CineRecap-b8j",
-        "Tigermovie213": "https://www.youtube.com/@Tigermovie213"
     }
 
     base_dir = r"C:\python\데이터수집"
     collector = YouTubeShortCollector(API_KEY)
 
     summary_report = []
+    all_scripts = {}
 
-    print("Starting Batch Data Collection...")
+    print("=" * 50)
+    print(" 2채널 쇼츠 대본 수집 시작")
+    print("=" * 50)
 
     for name, url in CHANNELS.items():
-        print(f"\nProcessing {name}...")
+        print(f"\n{'='*40}")
+        print(f"Processing {name}...")
+        print(f"{'='*40}")
         try:
-            data, channel_true_name = collector.collect_shorts_data(url)
+            # get_all_transcripts=True로 모든 쇼츠 대본 수집
+            data, channel_true_name = collector.collect_shorts_data(url, get_all_transcripts=True)
 
             if data:
-                # Overwrite file with fixed name
-                filename = os.path.join(base_dir, f"{name}_shorts.csv")
-                collector.save_to_csv(data, filename)
+                # CSV 저장
+                csv_filename = os.path.join(base_dir, f"{name}_shorts.csv")
+                collector.save_to_csv(data, csv_filename)
+
+                # JSON 저장
+                json_filename = os.path.join(base_dir, f"{name}_shorts.json")
+                collector.save_to_json(data, json_filename)
 
                 avg_views = sum(d['조회수'] for d in data) / len(data)
 
+                # 대본이 있는 영상만 모음
+                scripts_found = [d for d in data if d['스크립트']]
+
                 summary_report.append({
                     "Channel": name,
-                    "Videos": len(data),
-                    "Avg Views": int(avg_views),
-                    "Best Video": max(data, key=lambda x: x['조회수'])['제목']
+                    "ChannelName": channel_true_name,
+                    "TotalShorts": len(data),
+                    "ScriptsFound": len(scripts_found),
+                    "AvgViews": int(avg_views),
+                    "BestVideo": max(data, key=lambda x: x['조회수'])['제목'],
+                    "BestViews": max(data, key=lambda x: x['조회수'])['조회수']
                 })
+
+                all_scripts[name] = scripts_found
+
+                # 대본 있는 영상 출력
+                print(f"\n📝 {name} - 대본이 있는 영상: {len(scripts_found)}개 / 전체 쇼츠: {len(data)}개")
+                for i, s in enumerate(scripts_found[:5], 1):  # 상위 5개만 미리보기
+                    print(f"\n  [{i}] {s['제목']}")
+                    print(f"      조회수: {s['조회수']:,} | 좋아요: {s['좋아요']:,}")
+                    print(f"      대본: {s['스크립트'][:100]}...")
+
             else:
                 print(f"No shorts found for {name}")
 
@@ -278,13 +304,35 @@ def main():
             import traceback
             traceback.print_exc()
 
-    print("\n" + "=" * 30)
-    print(" SUMMARY REPORT ")
-    print("=" * 30)
-    for item in sorted(summary_report, key=lambda x: x['Avg Views'], reverse=True):
-        print(f"{item['Channel']}: {item['Avg Views']:,} avg views ({item['Videos']} videos)")
-        print(f"  Best: {item['Best Video']}")
-        print("-" * 20)
+    # 최종 요약
+    print("\n" + "=" * 60)
+    print(" 📊 최종 요약 리포트")
+    print("=" * 60)
+    for item in summary_report:
+        print(f"\n🎬 {item['Channel']} ({item['ChannelName']})")
+        print(f"   전체 쇼츠: {item['TotalShorts']}개")
+        print(f"   대본 수집: {item['ScriptsFound']}개")
+        print(f"   평균 조회수: {item['AvgViews']:,}")
+        print(f"   최고 영상: {item['BestVideo']} ({item['BestViews']:,}뷰)")
+        print("-" * 40)
+
+    # 전체 대본 JSON으로도 저장
+    scripts_output = os.path.join(base_dir, "2채널_대본모음.json")
+    all_script_data = []
+    for channel, scripts in all_scripts.items():
+        for s in scripts:
+            all_script_data.append({
+                "채널": channel,
+                "제목": s['제목'],
+                "조회수": s['조회수'],
+                "대본": s['스크립트'],
+                "URL": s['URL']
+            })
+
+    if all_script_data:
+        with open(scripts_output, 'w', encoding='utf-8') as f:
+            json.dump(all_script_data, f, ensure_ascii=False, indent=2)
+        print(f"\n✅ 전체 대본 파일 저장: {scripts_output}")
 
 
 if __name__ == "__main__":
