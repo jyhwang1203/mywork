@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MARKET TERMINAL</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=IBM+Plex+Sans+KR:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #161616;
+    --bg2: #1e1e1e;
+    --bg3: #252525;
+    --border: #2e2e2e;
+    --border2: #3a3a3a;
+    --text: #eeeeee;
+    --text2: #aaaaaa;
+    --text3: #555555;
+    --accent: #6eb8ff;
+    --accent2: #2979d4;
+    --green: #4fd866;
+    --green2: #2a9e44;
+    --red: #ff6b63;
+    --red2: #e03c38;
+    --yellow: #f0c060;
+    --cyan: #50e87a;
+    --header-h: 52px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 14px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── HEADER ── */
+  header {
+    height: var(--header-h);
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .logo {
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: 4px;
+    color: var(--accent);
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .logo::before {
+    content: '';
+    display: block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+
+  #clock {
+    font-size: 15px;
+    color: var(--text2);
+    letter-spacing: 2px;
+  }
+
+  #last-update {
+    font-size: 12px;
+    color: var(--text3);
+    letter-spacing: 1px;
+  }
+
+  .refresh-btn {
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    color: var(--accent);
+    padding: 7px 16px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    cursor: pointer;
+    letter-spacing: 1px;
+    transition: all .2s;
+  }
+  .refresh-btn:hover { background: var(--accent2); color: #fff; border-color: var(--accent); }
+  .refresh-btn:active { transform: scale(.97); }
+  .refresh-btn.loading { opacity: .5; cursor: not-allowed; }
+
+  /* ── LAYOUT ── */
+  .page { padding: 16px 20px 40px; display: flex; flex-direction: column; gap: 16px; }
+
+  /* ── SECTION ── */
+  .section {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+  }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg3);
+  }
+
+  .section-tag {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    padding: 3px 10px;
+    border: 1px solid currentColor;
+    text-transform: uppercase;
+  }
+  .tag-eq { color: var(--accent); }
+  .tag-cm { color: var(--yellow); }
+  .tag-fx { color: var(--cyan); }
+
+  .section-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text2);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  /* ── TABLE ── */
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .data-table th {
+    padding: 10px 16px;
+    text-align: right;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text2);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  .data-table th:first-child { text-align: left; }
+
+  .data-table td {
+    padding: 13px 16px;
+    text-align: right;
+    font-size: 15px;
+    border-bottom: 1px solid rgba(38,53,69,.7);
+    white-space: nowrap;
+    transition: background .15s;
+  }
+  .data-table tr:last-child td { border-bottom: none; }
+  .data-table td:first-child { text-align: left; color: var(--text); font-weight: 500; }
+  .data-table tr:hover td { background: rgba(110,184,255,.06); }
+
+  .name-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+  .name-main { font-size: 15px; font-weight: 600; color: var(--text); }
+  .name-sub { font-size: 11px; color: var(--text3); letter-spacing: 1px; margin-top: 2px; }
+
+  /* ── VALUE STATES ── */
+  .val { font-variant-numeric: tabular-nums; }
+  .val-up { color: var(--green); }
+  .val-dn { color: var(--red); }
+  .val-neu { color: var(--text2); }
+
+  .pct-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 8px;
+    font-size: 14px;
+    font-weight: 600;
+    border-radius: 2px;
+  }
+  .pct-up { color: var(--green); background: rgba(79,216,102,.13); }
+  .pct-dn { color: var(--red); background: rgba(255,107,99,.13); }
+  .pct-neu { color: var(--text2); background: rgba(176,190,200,.08); }
+
+  /* ── LOADING / ERROR ── */
+  .loading-row td { color: var(--text3); text-align: center; }
+  .error-row td { color: var(--red); font-size: 10px; }
+
+  .skeleton {
+    display: inline-block;
+    background: linear-gradient(90deg, var(--bg3) 25%, var(--border) 50%, var(--bg3) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.4s infinite;
+    border-radius: 2px;
+    height: 11px;
+  }
+  @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
+  /* ── STATUS BAR ── */
+  .status-bar {
+    display: flex;
+    gap: 16px;
+    padding: 8px 20px;
+    background: var(--bg2);
+    border-top: 1px solid var(--border);
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    font-size: 12px;
+  }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text3); }
+  .status-dot.ok { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .status-dot.err { background: var(--red); }
+
+  #api-status { display: flex; align-items: center; gap: 6px; }
+
+  /* ── FEAR GREED ── */
+  .fg-cell {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+  .fg-bar {
+    width: 60px; height: 6px;
+    background: var(--bg3);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .fg-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width .8s ease;
+  }
+
+  /* scan line effect */
+  body::after {
+    content:'';
+    position:fixed;
+    top:0;left:0;right:0;bottom:0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,.03) 2px, rgba(0,0,0,.03) 4px);
+    pointer-events:none;
+    z-index:9999;
+  }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width:768px) {
+    .data-table th:nth-child(n+5),
+    .data-table td:nth-child(n+5) { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Market Terminal</div>
+  <div class="header-right">
+    <div>
+      <div id="clock">--:--:--</div>
+      <div id="last-update">마지막 업데이트: --</div>
+    </div>
+    <button class="refresh-btn" id="refreshBtn" onclick="fetchAll()">↻ 새로고침</button>
+  </div>
+</header>
+
+<div class="page">
+
+  <!-- ① 주가지수 -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-tag tag-eq">EQ</span>
+      <span class="section-title">글로벌 주가지수</span>
+    </div>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>지수</th>
+          <th>현재가</th>
+          <th>전일종가</th>
+          <th>전일대비</th>
+          <th>1W</th>
+          <th>1M</th>
+          <th>YTD</th>
+          <th>1Y</th>
+        </tr>
+      </thead>
+      <tbody id="tbody-eq">
+        <tr><td colspan="8" style="text-align:center;color:var(--text3);padding:20px">데이터 로딩 중...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ② 원자재 -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-tag tag-cm">CM</span>
+      <span class="section-title">원자재 / Commodities</span>
+    </div>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>종목</th>
+          <th>현재가</th>
+          <th>전일종가</th>
+          <th>전일대비</th>
+          <th>1W</th>
+          <th>1M</th>
+          <th>YTD</th>
+          <th>1Y</th>
+        </tr>
+      </thead>
+      <tbody id="tbody-cm">
+        <tr><td colspan="8" style="text-align:center;color:var(--text3);padding:20px">데이터 로딩 중...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ③ 환율·채권·공포 -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-tag tag-fx">FX</span>
+      <span class="section-title">환율 / 채권 / 변동성</span>
+    </div>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>항목</th>
+          <th>현재가</th>
+          <th>전일종가</th>
+          <th>1D</th>
+          <th>1W</th>
+          <th>1M</th>
+          <th>YTD</th>
+          <th>1Y</th>
+        </tr>
+      </thead>
+      <tbody id="tbody-fx">
+        <tr><td colspan="8" style="text-align:center;color:var(--text3);padding:20px">데이터 로딩 중...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<div class="status-bar">
+  <div id="api-status"><div class="status-dot" id="dotApi"></div><span id="apiMsg">연결 대기 중</span></div>
+  <span>|</span>
+  <span>출처: Yahoo Finance · CNN Fear&Greed</span>
+  <span>|</span>
+  <span id="fetchCount">요청: 0</span>
+</div>
+
+<script>
+// ─────────────────────────────────────────────
+// CONFIG  ← 백엔드 주소만 여기서 변경
+// ─────────────────────────────────────────────
+const API_BASE = 'http://localhost:8000';
+
+// symbol → {name, sub, category}
+const SYMBOLS = {
+  // 주가지수
+  '^KS11':  { name:'코스피',   sub:'KOSPI',     cat:'eq' },
+  '^KQ11':  { name:'코스닥',   sub:'KOSDAQ',    cat:'eq' },
+  '^DJI':   { name:'다우',     sub:'DJIA',      cat:'eq' },
+  '^GSPC':  { name:'S&P 500',  sub:'SPX',       cat:'eq' },
+  '^IXIC':  { name:'나스닥',   sub:'NASDAQ',    cat:'eq' },
+  '^STOXX50E':{ name:'유로스톡스', sub:'Euro Stoxx 50', cat:'eq' },
+  '^N225':  { name:'니케이',   sub:'Nikkei 225',cat:'eq' },
+  '000001.SS':{ name:'상해종합', sub:'SSE',      cat:'eq' },
+  // 원자재
+  'GC=F':   { name:'금',       sub:'Gold Futures',       cat:'cm', unit:'USD/oz' },
+  'SI=F':   { name:'은',       sub:'Silver Futures',     cat:'cm', unit:'USD/oz' },
+  'CL=F':   { name:'WTI 유가', sub:'Crude Oil Futures',  cat:'cm', unit:'USD/bbl' },
+  'NG=F':   { name:'천연가스', sub:'Natural Gas Futures', cat:'cm', unit:'USD/MMBtu' },
+  // FX / 채권 / 변동성
+  'KRW=X':  { name:'원/달러',  sub:'USD/KRW',   cat:'fx' },
+  'DX-Y.NYB':{ name:'달러인덱스', sub:'DXY',    cat:'fx' },
+  'JPY=X':  { name:'달러/엔',  sub:'USD/JPY',   cat:'fx' },
+  'EURUSD=X':{ name:'달러/유로', sub:'EUR/USD', cat:'fx' },
+  'KR10YT=RR':{ name:'한국 10년물', sub:'KTB 10Y', cat:'fx', unit:'bp' },
+  '^TNX':   { name:'미국 10년물', sub:'US 10Y Treasury', cat:'fx', unit:'bp' },
+  '^VIX':   { name:'VIX',      sub:'Volatility Index',  cat:'fx' },
+};
+
+const ORDER_EQ = ['^KS11','^KQ11','^DJI','^GSPC','^IXIC','^STOXX50E','^N225','000001.SS'];
+const ORDER_CM = ['GC=F','SI=F','CL=F','NG=F'];
+const ORDER_FX = ['KRW=X','DX-Y.NYB','JPY=X','EURUSD=X','KR10YT=RR','^TNX','^VIX'];
+
+let fetchCount = 0;
+let dataStore = {};
+let fearGreedData = null;
+
+// ─────────────────────────────────────────────
+// UTILS
+// ─────────────────────────────────────────────
+const fmt = (v, d=2) => v == null ? '—' : Number(v).toLocaleString('ko-KR', {minimumFractionDigits:d, maximumFractionDigits:d});
+const fmtPct = v => v == null ? '—' : (v > 0 ? '+' : '') + v.toFixed(2) + '%';
+
+function pctClass(v) {
+  if (v == null || isNaN(v)) return 'pct-neu';
+  return v > 0 ? 'pct-up' : v < 0 ? 'pct-dn' : 'pct-neu';
+}
+function valClass(v) {
+  if (v == null || isNaN(v)) return 'val-neu';
+  return v > 0 ? 'val-up' : v < 0 ? 'val-dn' : 'val-neu';
+}
+function pctHtml(v) {
+  const cls = pctClass(v);
+  const arrow = v > 0 ? '▲' : v < 0 ? '▼' : '─';
+  return `<span class="pct-pill ${cls}">${arrow} ${fmtPct(v)}</span>`;
+}
+
+function calcPct(cur, prev) {
+  if (!cur || !prev || prev === 0) return null;
+  return (cur - prev) / prev * 100;
+}
+
+// ─────────────────────────────────────────────
+// FETCH — 백엔드 API 사용
+// ─────────────────────────────────────────────
+
+/** 백엔드 /api/quotes 엔드포인트로 전체 심볼 일괄 조회 */
+async function fetchAllQuotes(symbols) {
+  // =가 포함된 심볼(GC=F 등)은 encodeURIComponent 후 백엔드 키가 달라지는 문제가 있어
+  // 개별 요청을 병렬로 날리고 직접 심볼→데이터 맵을 만듦
+  const results = await Promise.allSettled(
+    symbols.map(sym =>
+      fetch(`${API_BASE}/api/quote/${encodeURIComponent(sym)}`, {
+        signal: AbortSignal.timeout(15000)
+      }).then(r => r.json())
+    )
+  );
+
+  const map = {};
+  results.forEach((r, i) => {
+    if (r.status === 'fulfilled' && !r.value.error) {
+      map[symbols[i]] = r.value;
+    }
+  });
+  return map;
+}
+
+/** 백엔드 /api/fear-greed 조회 */
+async function fetchFearGreed() {
+  try {
+    const res = await fetch(`${API_BASE}/api/fear-greed`, { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) return null;
+    const j = await res.json();
+    return { score: j.score, rating: j.rating, prev: j.previous_close };
+  } catch { return null; }
+}
+
+/** 단일 심볼 응답을 내부 포맷으로 변환 */
+function normalizeQuote(d) {
+  if (!d || d.error) return null;
+  return {
+    cur:    d.cur,
+    prev:   d.prev,
+    pct1d:  d.pct_1d,
+    pct1w:  d.pct_1w,
+    pct1m:  d.pct_1m,
+    pctYtd: d.pct_ytd,
+    pct1y:  d.pct_1y,
+  };
+}
+
+// ─────────────────────────────────────────────
+// RENDER ROW
+// ─────────────────────────────────────────────
+
+const BOND_SYMS = ['KR10YT=RR', '^TNX'];
+
+/** bp 차이 표시 — cur(현재 %값)과 과거가(%값)의 차이를 bp로 */
+function bpDiffHtml(cur, prev) {
+  if (cur == null || prev == null) return '—';
+  const diff = (cur - prev) * 100; // % 포인트 → bp
+  const abs  = Math.abs(diff).toFixed(1);
+  if (diff > 0.001)  return `<span class="pct-pill pct-up">▲ +${abs} bp</span>`;
+  if (diff < -0.001) return `<span class="pct-pill pct-dn">▼ -${abs} bp</span>`;
+  return `<span class="pct-pill pct-neu">─ 0.0 bp</span>`;
+}
+
+/** pct(%)로부터 과거가 역산 */
+function prevFromPct(cur, pct) {
+  if (cur == null || pct == null) return null;
+  return cur / (1 + pct / 100);
+}
+
+function makeRow(sym, data) {
+  const info   = SYMBOLS[sym];
+  const isBond = BOND_SYMS.includes(sym);
+  const decim  = isBond ? 3 : ['KRW=X','^VIX','DX-Y.NYB','JPY=X'].includes(sym) ? 2 : 2;
+  const d      = data || {};
+
+  // 금리: 현재가·전일종가를 bp(×100)로 표시
+  const fmtVal = (v) => {
+    if (v == null) return '—';
+    if (isBond) return (v * 100).toFixed(1) + ' bp';
+    return fmt(v, decim);
+  };
+
+  const diff1d  = isBond ? bpDiffHtml(d.cur, d.prev)                        : (d.pct1d  != null ? pctHtml(d.pct1d)  : '—');
+  const diff1w  = isBond ? bpDiffHtml(d.cur, prevFromPct(d.cur, d.pct1w))   : (d.pct1w  != null ? pctHtml(d.pct1w)  : '—');
+  const diff1m  = isBond ? bpDiffHtml(d.cur, prevFromPct(d.cur, d.pct1m))   : (d.pct1m  != null ? pctHtml(d.pct1m)  : '—');
+  const diffYtd = isBond ? bpDiffHtml(d.cur, prevFromPct(d.cur, d.pctYtd))  : (d.pctYtd != null ? pctHtml(d.pctYtd) : '—');
+  const diff1y  = isBond ? bpDiffHtml(d.cur, prevFromPct(d.cur, d.pct1y))   : (d.pct1y  != null ? pctHtml(d.pct1y)  : '—');
+
+  return `<tr>
+    <td><div class="name-cell"><span class="name-main">${info.name}</span><span class="name-sub">${info.sub}</span></div></td>
+    <td class="val ${valClass(d.pct1d)}">${fmtVal(d.cur)}</td>
+    <td class="val val-neu">${fmtVal(d.prev)}</td>
+    <td>${diff1d}</td>
+    <td>${diff1w}</td>
+    <td>${diff1m}</td>
+    <td>${diffYtd}</td>
+    <td>${diff1y}</td>
+  </tr>`;
+}
+
+function makeFgRow(fg) {
+  if (!fg || fg.score == null) {
+    return `<tr>
+      <td><div class="name-cell"><span class="name-main">공포탐욕지수</span><span class="name-sub">CNN Fear & Greed</span></div></td>
+      <td colspan="7" style="color:var(--text3)">데이터 없음 (CORS 제한)</td>
+    </tr>`;
+  }
+  const s = fg.score;
+  const color = s >= 60 ? '#3fb950' : s >= 40 ? '#e3b341' : '#f85149';
+  const label = fg.rating || '';
+  const pct1d = fg.prev != null ? ((s - fg.prev) / fg.prev * 100) : null;
+
+  return `<tr>
+    <td><div class="name-cell"><span class="name-main">공포탐욕지수</span><span class="name-sub">CNN Fear & Greed</span></div></td>
+    <td>
+      <div class="fg-cell">
+        <div class="fg-bar"><div class="fg-fill" style="width:${s}%;background:${color}"></div></div>
+        <span style="color:${color};font-weight:600">${s.toFixed(0)}</span>
+      </div>
+    </td>
+    <td style="color:var(--text3);font-size:10px">${label}</td>
+    <td>${pct1d != null ? pctHtml(pct1d) : '—'}</td>
+    <td>—</td><td>—</td><td>—</td><td>—</td>
+  </tr>`;
+}
+
+// ─────────────────────────────────────────────
+// RENDER ALL TABLES
+// ─────────────────────────────────────────────
+function renderTables() {
+  document.getElementById('tbody-eq').innerHTML = ORDER_EQ.map(s => makeRow(s, dataStore[s])).join('');
+  document.getElementById('tbody-cm').innerHTML = ORDER_CM.map(s => makeRow(s, dataStore[s])).join('');
+  document.getElementById('tbody-fx').innerHTML =
+    ORDER_FX.map(s => makeRow(s, dataStore[s])).join('') +
+    makeFgRow(fearGreedData);
+}
+
+// ─────────────────────────────────────────────
+// MAIN FETCH
+// ─────────────────────────────────────────────
+async function fetchAll() {
+  const btn = document.getElementById('refreshBtn');
+  const dot = document.getElementById('dotApi');
+  const msg = document.getElementById('apiMsg');
+
+  btn.classList.add('loading');
+  btn.textContent = '로딩 중...';
+  dot.className = 'status-dot';
+  msg.textContent = '백엔드 연결 중...';
+
+  // 스켈레톤 표시
+  const skeletonCells = Array(7).fill('<td><span class="skeleton" style="width:60px"></span></td>').join('');
+  document.getElementById('tbody-eq').innerHTML = ORDER_EQ.map(s =>
+    `<tr><td><div class="name-cell"><span class="name-main">${SYMBOLS[s].name}</span><span class="name-sub">${SYMBOLS[s].sub}</span></div></td>${skeletonCells}</tr>`
+  ).join('');
+  document.getElementById('tbody-cm').innerHTML = ORDER_CM.map(s =>
+    `<tr><td><div class="name-cell"><span class="name-main">${SYMBOLS[s].name}</span><span class="name-sub">${SYMBOLS[s].sub}</span></div></td>${skeletonCells}</tr>`
+  ).join('');
+  document.getElementById('tbody-fx').innerHTML = ORDER_FX.map(s =>
+    `<tr><td><div class="name-cell"><span class="name-main">${SYMBOLS[s].name}</span><span class="name-sub">${SYMBOLS[s].sub}</span></div></td>${skeletonCells}</tr>`
+  ).join('');
+
+  let errors = 0;
+  const allSymbols = [...ORDER_EQ, ...ORDER_CM, ...ORDER_FX];
+
+  try {
+    // ① 시세 일괄 조회 (백엔드 병렬 처리)
+    const raw = await fetchAllQuotes(allSymbols);
+    fetchCount++;
+    document.getElementById('fetchCount').textContent = `API 요청: ${fetchCount}`;
+
+    for (const sym of allSymbols) {
+      const norm = normalizeQuote(raw[sym]);
+      if (norm) dataStore[sym] = norm;
+      else errors++;
+    }
+  } catch (e) {
+    console.error('Batch fetch failed:', e);
+    errors = allSymbols.length;
+    dot.className = 'status-dot err';
+    msg.textContent = `백엔드 연결 실패 — ${e.message}`;
+  }
+
+  // ② Fear & Greed
+  fearGreedData = await fetchFearGreed();
+
+  // ③ 렌더
+  renderTables();
+
+  // ④ 상태 표시
+  const now = new Date();
+  document.getElementById('last-update').textContent =
+    '마지막 업데이트: ' + now.toLocaleTimeString('ko-KR');
+
+  if (errors === 0) {
+    dot.className = 'status-dot ok';
+    msg.textContent = '백엔드 정상 연결됨';
+  } else if (errors < allSymbols.length) {
+    dot.style.background = '#f0c060';
+    msg.textContent = `일부 심볼 오류 (${errors}건)`;
+  }
+
+  btn.classList.remove('loading');
+  btn.textContent = '↻ 새로고침';
+}
+
+// ─────────────────────────────────────────────
+// CLOCK
+// ─────────────────────────────────────────────
+function updateClock() {
+  document.getElementById('clock').textContent =
+    new Date().toLocaleTimeString('ko-KR', { hour12: false });
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ─────────────────────────────────────────────
+// AUTO REFRESH every 3 min
+// ─────────────────────────────────────────────
+setInterval(fetchAll, 3 * 60 * 1000);
+
+// ─────────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────────
+fetchAll();
+</script>
+</body>
+</html>

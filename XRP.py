@@ -85,8 +85,8 @@ CONFIG = {
     'ENABLE_REAL_TRADING': True,
     'SELECTION_MODE': 'AUTO',  # 'AUTO' 또는 'MANUAL'
 
-    'GRID_AMOUNT': 15000.0,  # 그리드 1칸당 투자 금액 (원)
-    'GRID_COUNT': 20,  # 그리드 칸수 (총 투자금 = GRID_AMOUNT × GRID_COUNT)
+    'GRID_AMOUNT': 10000.0,  # 그리드 1칸당 투자 금액 (원)
+    'GRID_COUNT': 60,  # 그리드 칸수 (총 투자금 = GRID_AMOUNT × GRID_COUNT)
     'MAX_BUY_ORDERS': 3,  # 현재가 아래 최대 매수 주문 개수 (계단식 매수)
     'KEEP_PROFIT_COINS': True,  # 실행 시 선택됨 (True: 수익 코인 보유 | False: 전량 매도)
 
@@ -2544,7 +2544,7 @@ def main():
 
             # AUTO 모드 처리 (또는 MANUAL이 아닌 경우)
             target = None  # 다음 루프에서 재스크리닝
-            log(f"⏳ {CONFIG['COOLDOWN_AFTER_EXIT']}초 후 재진입 스크리닝...")
+            log(f"⏳ {CONFIG['COOLDOWN_AFTER_EXIT']}초 후 재진입 스크2리닝...")
             time.sleep(CONFIG['COOLDOWN_AFTER_EXIT'])
 
     except KeyboardInterrupt:
