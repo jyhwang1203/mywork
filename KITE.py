@@ -85,8 +85,8 @@ CONFIG = {
     'ENABLE_REAL_TRADING': True,
     'SELECTION_MODE': 'AUTO',  # 'AUTO' 또는 'MANUAL'
 
-    'GRID_AMOUNT': 15000.0,  # 그리드 1칸당 투자 금액 (원)
-    'GRID_COUNT': 20,  # 그리드 칸수 (총 투자금 = GRID_AMOUNT × GRID_COUNT)
+    'GRID_AMOUNT':100000.0,  # 그리드 1칸당 투자 금액 (원)
+    'GRID_COUNT': 50,  # 그리드 칸수 (총 투자금 = GRID_AMOUNT × GRID_COUNT)
     'MAX_BUY_ORDERS': 3,  # 현재가 아래 최대 매수 주문 개수 (계단식 매수)
     'KEEP_PROFIT_COINS': True,  # 실행 시 선택됨 (True: 수익 코인 보유 | False: 전량 매도)
 
@@ -131,6 +131,10 @@ CONFIG = {
 # 🎯 가격 유틸리티
 # ============================================================================
 def get_tick_size(price):
+    """
+    업비트 호가 단위 (공식 문서 기준)
+    https://docs.upbit.com/docs/market-info-trade-price-detail
+    """
     if price >= 2000000:
         return 1000
     elif price >= 1000000:
@@ -142,15 +146,15 @@ def get_tick_size(price):
     elif price >= 10000:
         return 10
     elif price >= 1000:
-        return 1  # 1,000원 이상: 1원 단위
+        return 5  # 1,000원 ~ 10,000원: 5원 단위 (통일)
     elif price >= 100:
-        return 0.1
+        return 1  # 100원 ~ 1,000원: 1원 단위
     elif price >= 10:
-        return 0.01
+        return 0.1
     elif price >= 1:
-        return 0.001
+        return 0.01
     else:
-        return 0.0001
+        return 0.001
 
 
 def round_to_tick(price, direction='nearest'):
