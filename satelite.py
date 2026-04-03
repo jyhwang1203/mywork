@@ -39,7 +39,7 @@ TELEGRAM_CONFIG = {
 CONFIG = {
     'ENABLE_REAL_TRADING': True,
 
-    'GRID_AMOUNT': 10000.0,   # 초기 매수 기준금액; 그리드 매수는 잔여현금 × DYNAMIC_BUY_RATIO
+    'GRID_AMOUNT': 5100.0,   # 초기 매수 기준금액; 그리드 매수는 잔여현금 × DYNAMIC_BUY_RATIO
     'GRID_COUNT': 100,        # 최대 칸수 안전 상한 (스프레드 기반 자동 결정 시 참고용)
     'MAX_BUY_ORDERS': 3,
     'KEEP_PROFIT_COINS': True,
